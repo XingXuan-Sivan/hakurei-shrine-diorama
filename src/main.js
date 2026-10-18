@@ -13,6 +13,9 @@ const stage = document.getElementById('stage');
 const backdrop = document.getElementById('backdrop');
 const phaseName = document.getElementById('phase-name');
 const buttons = [...document.querySelectorAll('.controls button')];
+const IS_MOBILE =
+  window.matchMedia('(pointer: coarse)').matches ||
+  Math.min(window.innerWidth, window.innerHeight) < 720;
 
 initMaterials();
 
@@ -26,7 +29,7 @@ const renderer = new THREE.WebGLRenderer({
   alpha: true,
   powerPreference: 'high-performance',
 });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, IS_MOBILE ? 1.65 : 2));
 renderer.setClearAlpha(0);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = true;
@@ -45,7 +48,7 @@ scene.add(ambient);
 const sun = new THREE.DirectionalLight(0xffe3b6, 1.7);
 sun.position.set(-15, 25, 16);
 sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.mapSize.set(IS_MOBILE ? 1024 : 2048, IS_MOBILE ? 1024 : 2048);
 sun.shadow.camera.left = -21;
 sun.shadow.camera.right = 21;
 sun.shadow.camera.top = 21;
@@ -107,7 +110,6 @@ function resize() {
   sky.resize();
 }
 resize();
-window.addEventListener('resize', resize);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.copy(TARGET);
@@ -125,18 +127,50 @@ camera.lookAt(TARGET);
 
 const params = new URLSearchParams(window.location.search);
 const startZoom = parseFloat(params.get('zoom') || '1');
+
+// Portrait phones get a wider vertical FOV, a more frontal camera and a longer
+// distance. The old desktop framing cropped the left edge of the diorama, which
+// is where Reimu stands, so she appeared to be missing on a phone.
+let lastPortrait = null;
+function frameCamera(force = false) {
+  const aspect = camera.aspect;
+  const portrait = aspect < 0.92;
+  camera.fov = portrait ? 46 : FOV;
+  camera.updateProjectionMatrix();
+
+  const dir = portrait
+    ? new THREE.Vector3(14, 20, 42).normalize()
+    : CAM_START.clone().sub(TARGET).normalize();
+
+  let dist;
+  if (portrait) {
+    const neededWidth = 27.5;
+    dist = neededWidth / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * aspect);
+    dist = THREE.MathUtils.clamp(dist, 58, 92);
+  } else {
+    const fit = THREE.MathUtils.clamp(1.75 / aspect, 0.84, 1);
+    dist = 48 * fit;
+  }
+
+  if (force || portrait !== lastPortrait) {
+    camera.position.copy(TARGET).addScaledVector(dir, dist);
+    controls.update();
+    camera.lookAt(TARGET);
+  }
+  lastPortrait = portrait;
+}
+
+frameCamera(true);
 if (Number.isFinite(startZoom) && startZoom !== 1) {
   const dist = THREE.MathUtils.clamp(48 / startZoom, 26, 96);
-  const dir = CAM_START.clone().sub(TARGET).normalize();
+  const dir = camera.position.clone().sub(TARGET).normalize();
   camera.position.copy(TARGET).addScaledVector(dir, dist);
-} else {
-  // On short, wide windows the perspective camera otherwise leaves a lot of
-  // empty background; pull the framing in a little without cropping the model.
-  const aspect = window.innerWidth / Math.max(1, window.innerHeight);
-  const fit = THREE.MathUtils.clamp(1.75 / aspect, 0.84, 1);
-  const dir = CAM_START.clone().sub(TARGET).normalize();
-  camera.position.copy(TARGET).addScaledVector(dir, 48 * fit);
+  controls.update();
 }
+window.addEventListener('resize', () => {
+  resize();
+  frameCamera();
+});
 camera.updateProjectionMatrix();
 
 /* ------------------------------------------------------------------ */
