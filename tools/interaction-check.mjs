@@ -121,6 +121,18 @@ try {
     const body = tree.group.children[0];
     out.bodyTilt = +Math.hypot(body.rotation.x, body.rotation.z).toFixed(4);
 
+    // run the world on a fixed step so the shed leaves actually fall
+    for (let i = 1; i <= 150; i++) d.world.update(i / 60, 0, 1 / 60);
+    const parts = d.world.burst.parts;
+    out.burstLeft = parts.length;
+    out.burstLanded = parts.filter((p) => p.landed).length;
+    // a leaf must never end up below its own ground, and a landed one must sit on it
+    out.burstBadY = parts.filter((p) =>
+      p.landed ? Math.abs(p.y - p.ground) > 0.002 : p.y < p.ground - 0.002,
+    ).length;
+    out.treeTints = tree.tints;
+    out.tintOk = parts.every((p) => tree.tints.includes(p.tint));
+
     // --- slider ---
     const range = document.getElementById('clock-range');
     out.autoBefore = d.time.auto;
@@ -182,6 +194,9 @@ try {
   if (!(result.burstParts > 0)) fail.push('tree shake produced no burst leaves');
   if (!result.treeShaking) fail.push('tree not shaking');
   if (!(result.bodyTilt > 0.01)) fail.push('whole tree did not tilt, only the crown moved');
+  if (!result.tintOk) fail.push('shed leaves are not tinted like their own tree');
+  if (result.burstBadY > 0) fail.push('leaves hang above or sink below their tree base');
+  if (!(result.burstLanded > 0)) fail.push('no leaf ever settled on the ground');
   if (result.autoBefore !== true || result.autoAfter !== false) fail.push('auto flag not cleared by slider');
   if (Math.abs(result.target - 0.52) > 0.01) fail.push('slider did not retarget the clock');
   if (!result.sameSlip) fail.push('omikuji changed within one shrine day');

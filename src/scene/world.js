@@ -910,9 +910,16 @@ export class World {
     this.burst = { im: burstIM, parts: [] };
 
     const spawnFrom = new THREE.Vector3();
+    const basePos = new THREE.Vector3();
     this.burstLeaves = (tree, count = 16) => {
       if (!this.burst) return;
       tree.canopy.getWorldPosition(spawnFrom);
+      // the leaves belong to this tree, so they land at its foot: a single
+      // world-height floor would leave them hanging over a raised bed or sink
+      // them under the terrace
+      tree.group.getWorldPosition(basePos);
+      const ground = basePos.y + 0.02;
+      const tints = tree.tints && tree.tints.length ? tree.tints : [0x7d8f5c];
       const spread = Math.max(0.5, (tree.radius || 2) * 0.42);
       for (let n = 0; n < count; n++) {
         if (this.burst.parts.length >= 48) {
@@ -935,6 +942,9 @@ export class World {
           life: 0,
           max: 2.1 + this.rnd() * 1.1,
           scale: 0.7 + this.rnd() * 0.45,
+          ground,
+          tint: tints[Math.floor(this.rnd() * tints.length)],
+          landed: false,
         });
       }
     };
@@ -1090,25 +1100,34 @@ export class World {
     // leaves knocked loose by a shaken tree
     if (this.burst) {
       const dummy = this._fallDummy || (this._fallDummy = new THREE.Object3D());
+      const tintColor = this._burstColor || (this._burstColor = new THREE.Color());
       const im = this.burst.im;
       const keep = [];
       for (const p of this.burst.parts) {
         p.life += dt;
         if (p.life >= p.max) continue;
-        p.vy -= 4.2 * dt;
-        const drag = Math.exp(-dt * 1.15);
-        p.vx *= drag;
-        p.vz *= drag;
-        p.x += p.vx * dt + Math.sin(p.life * 5.5 + p.ry) * 0.3 * dt;
-        p.z += p.vz * dt + Math.cos(p.life * 4.5 + p.rx) * 0.3 * dt;
-        p.y += p.vy * dt;
-        p.rx += p.spin * dt;
-        p.rz += p.spin * 0.65 * dt;
-        if (p.y < 0.62) {
-          p.y = 0.62;
-          p.vy *= -0.12;
-          p.vx *= 0.8;
-          p.vz *= 0.8;
+        if (p.landed) {
+          // rest flat on the ground and fade out where it fell
+          p.y = p.ground;
+          p.rx += (-Math.PI / 2 - p.rx) * Math.min(1, dt * 10);
+          p.rz *= Math.exp(-dt * 8);
+        } else {
+          p.vy -= 4.2 * dt;
+          const drag = Math.exp(-dt * 1.15);
+          p.vx *= drag;
+          p.vz *= drag;
+          p.x += p.vx * dt + Math.sin(p.life * 5.5 + p.ry) * 0.3 * dt;
+          p.z += p.vz * dt + Math.cos(p.life * 4.5 + p.rx) * 0.3 * dt;
+          p.y += p.vy * dt;
+          p.rx += p.spin * dt;
+          p.rz += p.spin * 0.65 * dt;
+          if (p.y <= p.ground) {
+            p.y = p.ground;
+            p.landed = true;
+            p.max = Math.min(p.max, p.life + 0.9);
+            p.vx = 0;
+            p.vz = 0;
+          }
         }
         keep.push(p);
       }
@@ -1125,11 +1144,13 @@ export class World {
           dummy.position.set(p.x, p.y, p.z);
           dummy.rotation.set(p.rx, p.ry, p.rz);
           dummy.scale.setScalar(p.scale * Math.max(0, edge));
+          im.setColorAt(i, tintColor.setHex(p.tint));
         }
         dummy.updateMatrix();
         im.setMatrixAt(i, dummy.matrix);
       }
       im.instanceMatrix.needsUpdate = true;
+      if (keep.length && im.instanceColor) im.instanceColor.needsUpdate = true;
     }
 
     for (const m of this.motes) {

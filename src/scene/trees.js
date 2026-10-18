@@ -79,6 +79,10 @@ export function buildTree(parent, opts = {}) {
   root.add(body);
 
   const palette = pickPalette(kind);
+  // what this tree sheds: mid and light tones of its own crown, so a cherry
+  // drops petals and a pine drops needles instead of everything dropping the
+  // same autumn brown
+  const tints = [palette[1], palette[2], palette[3] ?? palette[2]];
   const H = trunkHeight * scale * 1.08;
   const cr = canopyRadius * scale * 1.82;
   const base = new THREE.Vector3(0, 0, 0);
@@ -199,6 +203,7 @@ export function buildTree(parent, opts = {}) {
     group: root,
     canopy,
     kind,
+    tints,
     radius: cr,
     phase,
     /** Kick the tree: a damped wobble that decays in about two seconds. */
