@@ -4,6 +4,8 @@
 
 当前版本：`0.1.0`
 
+在线预览：<https://xingxuan-sivan.github.io/hakurei-shrine-diorama/>
+
 本轮修订重点：主殿两侧山墙的窗户重做为每侧两扇、分别落在前后两个木构开间内的障子窗，加独立的深木窗台、小瓦檐和檐下支木，左右完全对称；主殿大门的两扇障子收窄并贴到门洞两侧，中央留出完整的暖光门洞，门洞内只保留深处的暖光壁面与祭坛，不再用贴在门槛上的发光面遮挡室内；侧墙去掉多余的侧门；后墙保持左右对称的两扇亮窗；绘马架与御神签架的牌匾都改为装在各自架子的右侧立柱上，并整体压低避开屋檐，不再穿模或继续放在架子顶上。
 
 ![白昼](screenshots/day.png)
@@ -25,6 +27,10 @@ npm run dev
 npm run build
 npm run preview
 ```
+
+## 部署
+
+推送到 `main` 后，GitHub Actions 会自动执行 `npm ci`、`npm run build`，并把 `dist/` 发布到 GitHub Pages。线上地址：<https://xingxuan-sivan.github.io/hakurei-shrine-diorama/>。
 
 ## 操作
 
