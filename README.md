@@ -74,6 +74,8 @@ npm run preview
 - `tools/tap-test.mjs` 用 headless Edge + CDP 驱动一遍交互自测（门、赛钱箱、灵梦、御神签、悬停、双击复位），需要先 `npm run dev`
 - 背景按「一天」参数化：太阳与月亮沿同一条弧线升落（6:00 日出、12:00 正午、18:00 日落、0:00 月到中天），天顶/地平/云/水色由若干关键色插值，日出日落时地平线泛暖、水面拉出一条粼光；同时驱动场景灯光色温与强度
 - `tools/interaction-check.mjs` 覆盖时间条、摇树落叶与御神签的一天一抽
+- 首屏：贴图在 `index.html` 里用 `<link rel="preload" as="image">` 提前抓取，与主包解析并行（否则要等 JS 跑起来才发起，手机上是十几秒的空等）；灵梦在图集解码完成前保持隐藏，避免出现一张没有贴图的空白剪影；`renderer.compile` 挪到首帧之后由 `requestIdleCallback` 预热，不再挡在第一帧前面
+- `tools/load-probe.mjs` 用 CDP 限速（1.6 Mbps、4× CPU、390×844）量 FCP / 首帧 / 灵梦出现时间，改动前后可直接对比
 
 ## 目录
 

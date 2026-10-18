@@ -6,6 +6,20 @@
     <meta name="theme-color" content="#0b1a1d" />
     <title>博丽神社 · 幻想乡的一隅</title>
     <link rel="stylesheet" href="./styles.css" />
+    <!-- The bundle takes a while to parse on a phone, and textures were only
+         requested once it ran. Fetching them from the HTML lets the downloads
+         overlap that work instead of queueing behind it. The character sheet is
+         the heaviest and gates Reimu, so it goes first. -->
+    <link rel="preload" as="image" href="./assets/reimu-atlas.webp" fetchpriority="high" />
+    <link rel="preload" as="image" href="./assets/reimu-shadow-atlas.webp" />
+    <link rel="preload" as="image" href="./assets/gravel.webp" />
+    <link rel="preload" as="image" href="./assets/roof-tile.webp" />
+    <link rel="preload" as="image" href="./assets/stone.webp" />
+    <link rel="preload" as="image" href="./assets/plaster.webp" />
+    <link rel="preload" as="image" href="./assets/wood.webp" />
+    <link rel="preload" as="image" href="./assets/paper.webp" />
+    <link rel="preload" as="image" href="./assets/soft-shadow.webp" />
+    <link rel="preload" as="image" href="./assets/glow.webp" />
   </head>
   <body>
     <canvas id="backdrop" aria-hidden="true"></canvas>

@@ -36,8 +36,10 @@ const SPOTS = [
   { x: -3.4, z: 6.8 },
 ];
 
-function makeAtlasTexture(file, { crisp }) {
-  const t = new THREE.TextureLoader().load(`./assets/${file}`);
+function makeAtlasTexture(file, { crisp, onReady } = {}) {
+  const t = new THREE.TextureLoader().load(`./assets/${file}`, () => {
+    if (onReady) onReady(t);
+  });
   t.colorSpace = THREE.SRGBColorSpace;
   t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
   t.repeat.set(1 / ATLAS.cols, 1 / ATLAS.rows);
@@ -55,7 +57,17 @@ export class Reimu {
     this.world = world;
     this.camera = camera;
 
-    this.map = makeAtlasTexture('reimu-atlas.webp', { crisp: true });
+    // the sheet is the heaviest asset, so she stays hidden until it is decoded:
+    // an untextured plane would otherwise sit there as a flat pale rectangle
+    this.ready = false;
+    this.map = makeAtlasTexture('reimu-atlas.webp', {
+      crisp: true,
+      onReady: () => {
+        this.ready = true;
+        if (this.sprite) this.sprite.visible = true;
+        if (this.shadowPlane) this.shadowPlane.visible = true;
+      },
+    });
     this.shadowMap = makeAtlasTexture('reimu-shadow-atlas.webp', { crisp: false });
 
     this.mat = new THREE.MeshToonMaterial({
@@ -86,6 +98,7 @@ export class Reimu {
     this.sprite.renderOrder = 2;
     this.sprite.castShadow = false;
     this.sprite.receiveShadow = false;
+    this.sprite.visible = this.ready;
     this.flip.add(this.sprite);
 
     this.shadow = new THREE.Group();
@@ -103,6 +116,7 @@ export class Reimu {
     );
     this.shadowPlane.rotation.x = -Math.PI / 2;
     this.shadowPlane.renderOrder = 3;
+    this.shadowPlane.visible = this.ready;
     this.shadow.add(this.shadowPlane);
 
     // a small radial contact shadow keeps the chibi firmly planted

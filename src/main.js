@@ -415,6 +415,9 @@ if (params.has('debug')) {
       get shrineDay() {
         return shrineDay;
       },
+      get reimuReady() {
+        return reimu.ready;
+      },
       get warmth() {
         return warmth;
       },
@@ -481,10 +484,8 @@ function frame() {
   requestAnimationFrame(frame);
 }
 
-// pre-warm shaders / textures before the first visible frame
-if (renderer.compile) renderer.compile(scene, camera);
-/* The scene is intentionally chrome-free: only the title and the time slider
- * sit above the canvas. */
+// pre-warm shaders / textures, but never in front of the first frame: on a phone
+// compiling every material up front delays the picture by seconds
 cel = celestialFor(timeOfDay);
 day = dayFor(cel);
 warmth = cel.warm;
@@ -495,4 +496,9 @@ if (clockTime) clockTime.textContent = clockText(cel);
 controls.update();
 renderer.render(scene, camera);
 requestAnimationFrame(frame);
+if (renderer.compile) {
+  const warm = () => renderer.compile(scene, camera);
+  if (window.requestIdleCallback) window.requestIdleCallback(warm, { timeout: 2000 });
+  else window.setTimeout(warm, 400);
+}
 
