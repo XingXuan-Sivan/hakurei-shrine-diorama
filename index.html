@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#0b1a1d" />
+    <title>博丽神社 · 幻想乡的一隅</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <canvas id="backdrop" aria-hidden="true"></canvas>
+    <div id="stage" aria-hidden="true"></div>
+
+    <header class="hud">
+      <h1 class="title">博丽神社 <i>·</i> <span id="phase-name">昼</span></h1>
+      <div class="controls" role="group" aria-label="昼夜切换">
+        <button type="button" data-mode="auto" class="active" aria-pressed="true">昼夜流转</button>
+        <button type="button" data-mode="day" aria-pressed="false">白昼</button>
+        <button type="button" data-mode="night" aria-pressed="false">夜晚</button>
+      </div>
+    </header>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
