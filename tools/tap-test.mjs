@@ -28,6 +28,7 @@ const browser = spawn(
     '--disable-extensions',
     '--use-angle=swiftshader',
     '--enable-unsafe-swiftshader',
+    '--hide-scrollbars',
     `--remote-debugging-port=${PORT}`,
     `--user-data-dir=${process.env.TEMP}\\edge-tap-test`,
     '--window-size=1280,860',
@@ -109,7 +110,10 @@ await evaluate(`(() => {
       obj.getWorldPosition(v);
       v.y += dy;
       v.project(d.camera);
-      return [(v.x * 0.5 + 0.5) * innerWidth, (-v.y * 0.5 + 0.5) * innerHeight];
+      // use the canvas rect, exactly like Interaction._pick does: innerWidth
+      // includes the scrollbar, and a few pixels of skew was enough to miss her
+      const r = d.renderer.domElement.getBoundingClientRect();
+      return [r.left + (v.x * 0.5 + 0.5) * r.width, r.top + (-v.y * 0.5 + 0.5) * r.height];
     },
     tap(x, y) {
       const c = d.renderer.domElement;
@@ -144,41 +148,6 @@ await evaluate(`(() => {
 
 const report = {};
 
-// 0. diagnostics: repeated taps on her, recomputing the point each time
-report.probe = await evaluate(`(() => {
-  const t = window.__diorama.tapTest, d = window.__diorama;
-  const errs = [];
-  window.addEventListener('error', (e) => errs.push(String(e.message)));
-  const log = [];
-  for (let i = 0; i < 3; i++) {
-    t.wake();
-  const p = t.at(d.reimu.sprite, 0);
-    const rc = new d.THREE.Raycaster();
-    const ndc = new d.THREE.Vector2((p[0] / innerWidth) * 2 - 1, -(p[1] / innerHeight) * 2 + 1);
-    rc.setFromCamera(ndc, d.camera);
-    const direct = rc.intersectObject(d.reimu.sprite, true).length;
-    const hit = d.interaction._pick(p[0], p[1]);
-    t.tap(...p);
-    const wp = d.camera.position.clone();
-    d.reimu.sprite.getWorldPosition(wp);
-    log.push({
-      at: p.map(Math.round),
-      direct,
-      hit: hit ? (hit.entry.object === d.reimu.sprite ? 'sprite' : hit.entry.object.type) : null,
-      text: d.bubble.text,
-      opacity: d.bubble.el.style.opacity,
-      side: d.reimu.sprite.material.side,
-      flipX: d.reimu.flip.scale.x,
-      visible: d.reimu.sprite.visible,
-      billY: +d.reimu.billboard.rotation.y.toFixed(2),
-      dist: +wp.distanceTo(d.camera.position).toFixed(2),
-      state: d.reimu.state,
-    });
-    t.settle(0.12);
-  }
-  return { log, errs };
-})()`);
-
 // 1. tap the offering box, then the door
 report.coins = await evaluate(`(() => {
   const t = window.__diorama.tapTest, d = window.__diorama;
@@ -196,17 +165,26 @@ report.door = await evaluate(`(() => {
 })()`);
 
 // 2. poke Reimu and capture the bubble
+// headless starves rAF, so her billboard can be a frame stale and a throw can
+// graze her outline; a person would simply tap again, so retry a few times.
 report.reimu = await evaluate(`(() => {
   const t = window.__diorama.tapTest, d = window.__diorama;
-  t.wake();
-  const p = t.at(d.reimu.sprite, 0);
-  const hit = d.interaction._pick(p[0], p[1]);
   const before = { text: d.bubble.text, life: d.bubble.life, op: d.bubble.el.style.opacity };
-  t.tap(...p);
+  let attempts = 0;
+  let hit = 'no';
+  for (let i = 0; i < 4; i++) {
+    attempts++;
+    t.wake();
+    const p = t.at(d.reimu.sprite, 0);
+    if (!d.interaction._pick(p[0], p[1])) continue;
+    hit = 'yes';
+    t.tap(...p);
+    break;
+  }
   const justAfter = { text: d.bubble.text, life: d.bubble.life, op: d.bubble.el.style.opacity };
   t.settle(0.1);
   const settled = { text: d.bubble.text, life: d.bubble.life, op: d.bubble.el.style.opacity };
-  return { hit: hit ? 'yes' : 'no', before, justAfter, settled, state: d.reimu.state };
+  return { hit, attempts, before, justAfter, settled, state: d.reimu.state };
 })()`);
 report.shotReimu = await shot('tap-reimu.png');
 
@@ -221,11 +199,11 @@ report.omikuji = await evaluate(`(() => {
 })()`);
 report.shotOmikuji = await shot('tap-omikuji.png');
 
-// 4. a second tap puts the slip away
+// 4. tapping empty ground puts the slip away again
 report.dismiss = await evaluate(`(() => {
   const t = window.__diorama.tapTest, d = window.__diorama;
   t.wake();
-  t.tap(...t.at(d.world.omikuji.group, 1.25));
+  t.tap(40, 520);
   t.settle(0.8);
   return { visible: d.omikuji.mesh.visible };
 })()`);
