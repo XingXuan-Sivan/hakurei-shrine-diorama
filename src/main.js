@@ -254,7 +254,10 @@ function phaseLabel(c) {
 /* ---- slider ---- */
 function setAuto(next) {
   auto = next;
-  clockAuto.setAttribute('aria-pressed', auto ? 'true' : 'false');
+  // the chip names the state it is in, and lights up only while the clock is held
+  clockAuto.textContent = auto ? '自动' : '锁定';
+  clockAuto.setAttribute('aria-pressed', auto ? 'false' : 'true');
+  clockAuto.setAttribute('aria-label', auto ? '时间自动流转，点击锁定当前时刻' : '时间已锁定，点击恢复自动流转');
   clockUi.classList.toggle('is-auto', auto);
   if (auto) targetTime = timeOfDay;
 }
@@ -293,7 +296,19 @@ function updateLights(night) {
   sun.color.copy(daySun).lerp(duskSun, warmth * 0.9);
   sun.color.lerp(nightSun, night * 0.85);
   sun.intensity = THREE.MathUtils.lerp(1.7, 0.84, night) * (1 - warmth * 0.18) * (1 + Math.sin(t * 0.21) * 0.028);
-  sun.position.set(-15 + Math.sin(t * 0.13) * 0.85, 25, 16 + Math.cos(t * 0.1) * 0.65);
+
+  // the key light rides the same arc the sky draws: azimuth sweeps behind the
+  // diorama from left to right while the altitude rises and falls, so shadows
+  // swing across the courtyard and stretch out at dawn and dusk
+  const phi = THREE.MathUtils.degToRad(-70 + 140 * cel.u);
+  const elev = THREE.MathUtils.degToRad(6 + 60 * cel.alt);
+  const cosE = Math.cos(elev);
+  const R = 42;
+  sun.position.set(
+    sun.target.position.x + Math.sin(phi) * cosE * R,
+    sun.target.position.y + Math.sin(elev) * R,
+    sun.target.position.z - Math.cos(phi) * cosE * R,
+  );
   fill.color.copy(dayFill).lerp(nightFill, night);
   fill.intensity = THREE.MathUtils.lerp(0.58, 0.38, night);
   facadeFill.intensity = THREE.MathUtils.lerp(0.34, 0.08, night);

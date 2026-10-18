@@ -14,7 +14,15 @@
     <header class="hud">
       <h1 class="title">博麗神社 <i>·</i> <span id="phase-name">昼</span></h1>
       <div class="clock" role="group" aria-label="时间">
-        <button id="clock-auto" class="clock-auto" type="button" aria-pressed="true">自动</button>
+        <button
+          id="clock-auto"
+          class="clock-auto"
+          type="button"
+          aria-pressed="false"
+          aria-label="时间自动流转，点击锁定当前时刻"
+        >
+          自动
+        </button>
         <div class="clock-dial">
           <span class="clock-arc" aria-hidden="true"></span>
           <span class="clock-ticks" aria-hidden="true"><i></i><i></i><i></i><i></i></span>

@@ -72,6 +72,11 @@ export function buildTree(parent, opts = {}) {
   const root = new THREE.Group();
   root.position.set(x, y, z);
   parent.add(root);
+  // everything hangs off `body`, which pivots at the base: shaking the tree
+  // tilts the whole thing, trunk included, instead of only wobbling the crown
+  const body = new THREE.Group();
+  body.rotation.order = 'YXZ';
+  root.add(body);
 
   const palette = pickPalette(kind);
   const H = trunkHeight * scale * 1.08;
@@ -83,25 +88,25 @@ export function buildTree(parent, opts = {}) {
   top.x += Math.sin(seed * 1.3) * 0.22 * scale;
   top.z += Math.cos(seed * 0.9) * 0.16 * scale;
 
-  limb(root, base, mid, 0.3 * scale, 0.21 * scale);
-  limb(root, mid, top, 0.21 * scale, 0.12 * scale);
+  limb(body, base, mid, 0.3 * scale, 0.21 * scale);
+  limb(body, mid, top, 0.21 * scale, 0.12 * scale);
   const forkY = H * 0.72;
   const forkBase = base.clone().addScaledVector(dir, forkY);
   for (let i = 0; i < 2; i++) {
     const a = seed * 1.9 + i * 2.4;
     const p = new THREE.Vector3(Math.cos(a) * cr * 0.36, forkY + H * 0.13, Math.sin(a) * cr * 0.36);
-    limb(root, forkBase, p, 0.11 * scale, 0.055 * scale);
+    limb(body, forkBase, p, 0.11 * scale, 0.055 * scale);
   }
   for (let i = 0; i < 5; i++) {
     const a = (i / 5) * Math.PI * 2 + seed;
     const p = new THREE.Vector3(Math.cos(a) * 0.6 * scale, -0.02, Math.sin(a) * 0.6 * scale);
-    limb(root, new THREE.Vector3(0, 0.14, 0), p, 0.15 * scale, 0.035 * scale, trunkMatDark);
+    limb(body, new THREE.Vector3(0, 0.14, 0), p, 0.15 * scale, 0.035 * scale, trunkMatDark);
   }
 
   const canopy = new THREE.Group();
   canopy.position.copy(top);
   canopy.rotation.order = 'YXZ';
-  root.add(canopy);
+  body.add(canopy);
   const crownInner = new THREE.Group();
   crownInner.rotation.order = 'YXZ';
   canopy.add(crownInner);
@@ -183,7 +188,7 @@ export function buildTree(parent, opts = {}) {
     m.position.set(Math.cos(a) * rr * scale, 0.05, Math.sin(a) * rr * scale);
     m.scale.set(0.32 + rnd() * 0.25, 0.06 + rnd() * 0.05, 0.24 + rnd() * 0.2);
     m.receiveShadow = true;
-    root.add(m);
+    body.add(m);
   }
 
   const basePos = canopy.position.clone();
@@ -196,7 +201,7 @@ export function buildTree(parent, opts = {}) {
     kind,
     radius: cr,
     phase,
-    /** Kick the crown: a damped wobble that decays in about a second. */
+    /** Kick the tree: a damped wobble that decays in about two seconds. */
     shake: (strength = 1) => {
       shakeAt = lastT;
       shakeAmp = Math.min(1.35, shakeAmp * 0.55 + strength);
@@ -221,6 +226,11 @@ export function buildTree(parent, opts = {}) {
       } else if (age >= 2.6 && shakeAmp) {
         shakeAmp = 0;
       }
+
+      // wind leans the trunk a touch, the shake swings the whole tree from the
+      // base, and the crown lags behind it so the foliage whips a little more
+      body.rotation.z = slow * 0.009 + kick * 0.34;
+      body.rotation.x = slow2 * 0.006 + kickX * 0.28;
 
       canopy.rotation.z = slow * 0.034 + Math.sin(t * 1.35 + phase * 2.1) * 0.007 + kick;
       canopy.rotation.x = slow2 * 0.026 + kickX;

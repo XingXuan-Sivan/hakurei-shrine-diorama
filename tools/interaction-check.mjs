@@ -115,6 +115,11 @@ try {
     await sleep(120);
     out.burstParts = d.world.burst.parts.length;
     out.treeShaking = !!tree.shaking;
+    // the trunk has to move too, not just the crown: the whole tree is parented
+    // to a body group that pivots at the base
+    tree.sway(0.2, 1);
+    const body = tree.group.children[0];
+    out.bodyTilt = +Math.hypot(body.rotation.x, body.rotation.z).toFixed(4);
 
     // --- slider ---
     const range = document.getElementById('clock-range');
@@ -163,9 +168,10 @@ try {
     await sleep(700);
     out.loopAlive = d.time.tod !== a0;
     if (out.loopAlive) {
-      d.time.tod = 0.9992;
-      await sleep(1400);
+      d.time.tod = 0.9998;
+      await sleep(3200);
       out.shrineDayAfterWrap = d.time.shrineDay;
+      out.todAfterWrap = +d.time.tod.toFixed(4);
     }
     return out;
   })()`);
@@ -175,6 +181,7 @@ try {
   const fail = [];
   if (!(result.burstParts > 0)) fail.push('tree shake produced no burst leaves');
   if (!result.treeShaking) fail.push('tree not shaking');
+  if (!(result.bodyTilt > 0.01)) fail.push('whole tree did not tilt, only the crown moved');
   if (result.autoBefore !== true || result.autoAfter !== false) fail.push('auto flag not cleared by slider');
   if (Math.abs(result.target - 0.52) > 0.01) fail.push('slider did not retarget the clock');
   if (!result.sameSlip) fail.push('omikuji changed within one shrine day');
