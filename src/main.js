@@ -4,6 +4,11 @@ import { SkyBackdrop } from './sky.js';
 import { initMaterials } from './palette.js';
 import { World } from './scene/world.js';
 import { Reimu } from './character.js';
+import { Interaction } from './interaction.js';
+import { SpeechBubble } from './bubble.js';
+import { Omikuji } from './omikuji.js';
+import { Coins } from './coins.js';
+import { playSlide } from './audio.js';
 
 const TARGET = new THREE.Vector3(0, 2.6, -0.6);
 const CAM_START = new THREE.Vector3(26.8, 19.8, 35.8);
@@ -257,6 +262,60 @@ function updateLights(night) {
 }
 
 /* ------------------------------------------------------------------ */
+/* interaction                                                         */
+/* ------------------------------------------------------------------ */
+scene.add(camera); // the omikuji slip lives in camera space
+
+const bubble = new SpeechBubble(stage);
+const omikuji = new Omikuji(camera);
+const coins = new Coins({ scene, camera, saisen: world.shrine.saisen.group });
+
+const interaction = new Interaction({
+  camera,
+  dom: renderer.domElement,
+  onDoubleTap: () => frameCamera(true),
+  onEmptyTap: () => {
+    bubble.hide();
+    omikuji.dismiss();
+  },
+});
+
+const headAnchor = (v) => reimu.headWorld(v);
+
+interaction.add(reimu.sprite, {
+  onTap: () => {
+    if (!reimu.poke()) return;
+    bubble.say(bubble.pickLine());
+  },
+});
+
+const doorTap = () => {
+  world.shrine.toggleDoor();
+  playSlide();
+};
+interaction.add(world.shrine.doorHit, { onTap: doorTap });
+interaction.add(world.shrine.doors.left.group, { onTap: doorTap });
+interaction.add(world.shrine.doors.right.group, { onTap: doorTap });
+
+interaction.add(world.shrine.saisen.group, { onTap: () => coins.toss() });
+
+const rackPoint = new THREE.Vector3();
+interaction.add(world.omikuji.group, {
+  onTap: () => {
+    world.omikuji.group.getWorldPosition(rackPoint);
+    rackPoint.y += 1.2;
+    omikuji.show(rackPoint);
+  },
+});
+
+if (params.get('door') === 'closed') world.shrine.setDoor(false);
+
+// dev hook: lets a headless browser drive and inspect the scene
+if (params.has('debug')) {
+  window.__diorama = { THREE, scene, camera, renderer, controls, world, reimu, interaction, bubble, omikuji, coins };
+}
+
+/* ------------------------------------------------------------------ */
 /* loop                                                                */
 /* ------------------------------------------------------------------ */
 const clock = new THREE.Clock();
@@ -280,6 +339,11 @@ function frame() {
   sky.update(t, day);
   world.update(t, night, dt);
   reimu.update(dt, t, night);
+
+  interaction.update();
+  bubble.update(dt, camera, headAnchor);
+  omikuji.update(dt);
+  coins.update(dt);
 
   const label = phaseLabel();
   if (label !== lastPhaseLabel) {

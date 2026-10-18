@@ -15,8 +15,10 @@ np_rng = np.random.default_rng(20240607)
 
 
 def save(img, name):
-    img.save(os.path.join(OUT, name))
-    print("wrote", name, img.size)
+    # ship lossless WebP: same pixels as PNG, about a third fewer bytes
+    out = os.path.join(OUT, name.replace(".png", ".webp"))
+    img.save(out, "WEBP", lossless=True, quality=100, method=6)
+    print("wrote", os.path.basename(out), img.size)
 
 
 def noise_layer(w, h, scale=1.0, octaves=3):

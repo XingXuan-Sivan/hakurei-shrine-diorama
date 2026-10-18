@@ -55,8 +55,8 @@ export class Reimu {
     this.world = world;
     this.camera = camera;
 
-    this.map = makeAtlasTexture('reimu-atlas.png', { crisp: true });
-    this.shadowMap = makeAtlasTexture('reimu-shadow-atlas.png', { crisp: false });
+    this.map = makeAtlasTexture('reimu-atlas.webp', { crisp: true });
+    this.shadowMap = makeAtlasTexture('reimu-shadow-atlas.webp', { crisp: false });
 
     this.mat = new THREE.MeshToonMaterial({
       map: this.map,
@@ -109,7 +109,7 @@ export class Reimu {
     this.contact = mesh(
       new THREE.PlaneGeometry(1, 1),
       new THREE.MeshBasicMaterial({
-        map: tex('soft-shadow.png'),
+        map: tex('soft-shadow.webp'),
         color: 0xf2f2ec,
         transparent: true,
         opacity: 0.42,
@@ -125,7 +125,7 @@ export class Reimu {
     // landing dust puffs
     this.dust = [];
     const dustMat = new THREE.SpriteMaterial({
-      map: tex('soft-shadow.png'),
+      map: tex('soft-shadow.webp'),
       color: 0xd9c9a3,
       transparent: true,
       opacity: 0,
@@ -241,6 +241,25 @@ export class Reimu {
     this.pauseFor = seconds;
     this.pauseTurned = false;
     this._setFrame(7);
+  }
+
+  /**
+   * Tap response: stop sweeping, square up to the camera and stay put for a
+   * beat. Mid-hop she keeps the hop but still answers, so a tap never feels
+   * ignored.
+   */
+  poke() {
+    if (this.state !== 'jump') {
+      this._enterPause(2.6);
+      this.pauseTurned = true; // no idle turn while she is "talking"
+      this.rounds = 0;
+    }
+    return true;
+  }
+
+  /** World-space point just above her head, for anchoring the speech bubble. */
+  headWorld(target) {
+    return target.set(this.x, this.ground + this.lift + SPRITE_H * 1.02, this.z);
   }
 
   _chooseSpot() {

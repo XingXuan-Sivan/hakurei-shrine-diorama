@@ -154,3 +154,64 @@ body {
     transition: none;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* speech bubble                                                       */
+/* ------------------------------------------------------------------ */
+/* Projected onto Reimu's head every frame, so the element itself only
+ * carries the look; position and opacity are written inline. */
+.speech {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 4;
+  max-width: 14em;
+  padding: 7px 11px;
+  font-family: "Songti SC", "STSong", "SimSun", "Noto Serif SC", serif;
+  font-size: 13px;
+  line-height: 1.55;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+  background: rgba(246, 238, 219, 0.94);
+  border: 1px solid rgba(16, 36, 37, 0.26);
+  border-radius: 10px;
+  box-shadow: 0 8px 20px rgba(12, 22, 22, 0.22);
+  opacity: 0;
+  pointer-events: none;
+  will-change: transform, opacity;
+  transform-origin: 50% 100%;
+}
+
+.speech::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -5px;
+  width: 9px;
+  height: 9px;
+  margin-left: -5px;
+  background: inherit;
+  border-right: 1px solid rgba(16, 36, 37, 0.26);
+  border-bottom: 1px solid rgba(16, 36, 37, 0.26);
+  transform: rotate(45deg);
+}
+
+.speech.pop {
+  animation: speech-flash 420ms ease-out;
+}
+
+@keyframes speech-flash {
+  from {
+    background: rgba(255, 252, 240, 1);
+  }
+  to {
+    background: rgba(246, 238, 219, 0.94);
+  }
+}
+
+@media (max-width: 560px) {
+  .speech {
+    max-width: 12em;
+    font-size: 12px;
+  }
+}

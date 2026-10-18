@@ -41,7 +41,7 @@ function shoji(parent, opts = {}) {
   const paperMat =
     mat ||
     toon(C.paper, {
-      map: tex('paper.png'),
+      map: tex('paper.webp'),
       emissive: 0xffa955,
       emissiveIntensity: 0,
       side: THREE.FrontSide,
@@ -158,8 +158,9 @@ export function buildShrine(parent, opts = {}) {
   // main plaster field, split around the door
   plasterPanel(root, 2.48, 1.62, { x: -2.38, y: 1.95, z: wallZ });
   plasterPanel(root, 2.48, 1.62, { x: 2.38, y: 1.95, z: wallZ });
-  // lower red wainscot
-  batch.box(M.redDark, 7.18, 0.56, 0.22, 0, 1.02, wallZ);
+  // lower red wainscot, split so it runs up to the door reveal on both sides
+  batch.box(M.redDark, 2.35, 0.56, 0.22, -2.42, 1.02, wallZ);
+  batch.box(M.redDark, 2.35, 0.56, 0.22, 2.42, 1.02, wallZ);
   batch.box(M.woodDark, 7.2, 0.06, 0.26, 0, 1.32, wallZ);
   // transom above the door
   plasterPanel(root, 2.18, 0.34, { x: 0, y: 2.66, z: wallZ });
@@ -200,43 +201,78 @@ export function buildShrine(parent, opts = {}) {
     batch.box(M.woodDark, 0.64, 0.05, 0.06, px, 2.99, wallZ + 0.15);
   }
 
-  // doors: the left leaf is slid back and the right leaf is pushed aside,
-  // leaving a real half-open gap onto the lit interior
-  const doorZ = wallZ + 0.13;
-  const leftDoor = shoji(root, { w: 0.68, h: 1.64, x: -0.76, y: 1.66, z: doorZ, cols: 3, rows: 6, sill: false });
-  const rightDoor = shoji(root, { w: 0.68, h: 1.64, x: 0.76, y: 1.66, z: doorZ + 0.035, cols: 3, rows: 6, sill: false });
-  windows.push(leftDoor.mat, rightDoor.mat);
-  // no central jamb: the two leaves are slid apart to leave an open doorway
-  batch.box(M.redDark, 2.25, 0.12, 0.12, 0, 0.78, doorZ + 0.02);
-  batch.box(M.woodDark, 2.24, 0.09, 0.14, 0, 2.47, doorZ + 0.02);
+  /* ---- sliding shoji doors (引分け遣戸) ---- */
+  // Two leaves in two grooves. Closed they meet on the centre line; open they
+  // slide in behind the jambs, so each leaf still shows ~0.4m at the side
+  // instead of the doorway simply going black.
+  const DOOR_W = 1.1;
+  const DOOR_H = 1.55;
+  const DOOR_CY = 1.634;
+  const DOOR_CLOSED_X = 0.55;
+  const DOOR_OPEN_X = 1.3;
+  const DOOR_Z_LEFT = 0.19;
+  const DOOR_Z_RIGHT = 0.33;
+  const doorState = { open: 1, target: 1 };
 
-  // half-open door: a warm, shallow interior niche with an altar, so the
-  // opening reads as the inside of the hall rather than a black rectangle
-  batch.box(M.woodDeep, 2.24, 1.9, 0.16, 0, 1.48, doorZ - 0.8);
-  batch.box(M.woodDark, 2.34, 0.12, 0.26, 0, 2.42, doorZ - 0.78);
-  batch.box(M.wood, 1.2, 0.1, 0.52, 0, 0.92, doorZ - 0.28);
-  batch.box(M.woodDark, 0.12, 0.5, 0.12, -0.5, 0.68, doorZ - 0.28);
-  batch.box(M.woodDark, 0.12, 0.5, 0.12, 0.5, 0.68, doorZ - 0.28);
-  batch.box(M.red, 0.64, 0.46, 0.3, 0, 1.18, doorZ - 0.3);
-  batch.box(M.brass, 0.72, 0.06, 0.34, 0, 1.42, doorZ - 0.3);
+  const leftDoor = shoji(root, { w: DOOR_W, h: DOOR_H, x: -DOOR_CLOSED_X, y: DOOR_CY, z: DOOR_Z_LEFT, cols: 5, rows: 6, sill: false });
+  const rightDoor = shoji(root, { w: DOOR_W, h: DOOR_H, x: DOOR_CLOSED_X, y: DOOR_CY, z: DOOR_Z_RIGHT, cols: 5, rows: 6, sill: false });
+  windows.push(leftDoor.mat, rightDoor.mat);
+
+  const clamp01 = (v) => Math.min(1, Math.max(0, v));
+  const easeInOut = (p) => (p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2);
+  // the right leaf leads by a hair so the stiles never jam against each other
+  const applyDoor = (p) => {
+    const travel = DOOR_OPEN_X - DOOR_CLOSED_X;
+    rightDoor.group.position.x = DOOR_CLOSED_X + travel * easeInOut(clamp01(p * 1.05));
+    leftDoor.group.position.x = -DOOR_CLOSED_X - travel * easeInOut(clamp01((p - 0.05) / 0.95));
+  };
+  applyDoor(doorState.open);
+
+  const setDoor = (open) => {
+    doorState.target = open ? 1 : 0;
+    return doorState.target;
+  };
+  const toggleDoor = () => setDoor(doorState.target < 0.5);
+
+  // threshold and head rail carry the two grooves; both stay clear of the leaves
+  batch.box(M.woodDeep, 2.28, 0.14, 0.32, 0, 0.73, 0.26);
+  batch.box(M.woodDark, 2.28, 0.07, 0.29, 0, 2.499, 0.26);
+  // jambs close the reveal between the leaves and the plaster field
+  for (const s of [-1, 1]) batch.box(M.woodDark, 0.12, 1.65, 0.26, s * 1.08, 1.635, 0.53);
+
+  // invisible in the scene, but it gives the doorway a tap target in every state
+  const doorHit = mesh(
+    new THREE.PlaneGeometry(2.14, 1.9),
+    new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }),
+    { parent: root, y: 1.35, z: 0.38, cast: false, receive: false },
+  );
+
+  // the hall behind the leaves: a shallow, warm niche with an altar, so the
+  // opening reads as an interior rather than a black rectangle. Everything in
+  // here starts behind z≈0.10, clear of the leaves even when they are closed.
+  const doorZ = 0.16;
+  // side walls and a ceiling close the box, so the niche has corners and shadow
+  for (const s of [-1, 1]) batch.box(M.woodDeep, 0.1, 1.92, 0.62, s * 0.66, 1.47, doorZ - 0.31);
+  batch.box(M.woodDark, 1.44, 0.08, 0.62, 0, 2.44, doorZ - 0.31);
+  batch.box(M.woodDeep, 2.24, 1.9, 0.1, 0, 1.48, doorZ - 0.4);
+  batch.box(M.wood, 1.2, 0.1, 0.34, 0, 0.92, doorZ - 0.24);
+  batch.box(M.red, 0.64, 0.46, 0.3, 0, 1.18, doorZ - 0.37);
+  batch.box(M.brass, 0.72, 0.06, 0.34, 0, 1.42, doorZ - 0.37);
   mesh(new THREE.SphereGeometry(0.11, 10, 8), M.gold, {
     parent: root,
     x: 0,
     y: 1.54,
-    z: doorZ - 0.3,
+    z: doorZ - 0.37,
     cast: true,
   });
-  // a dim hanging scroll inside, visible through the opening
-  batch.box(M.paperCool, 0.44, 1.0, 0.02, 0.72, 1.72, doorZ - 0.7);
-  batch.box(M.ink, 0.2, 0.4, 0.012, 0.72, 1.78, doorZ - 0.685);
-  // the warm niche card sits deep inside the opening; there is deliberately no
-  // flat glow plane at the threshold, so the doorway reads as real interior
+  // warm lamp card deep in the niche; there is deliberately no flat glow plane
+  // at the threshold, so the doorway reads as real interior
   const innerMat = new THREE.MeshBasicMaterial({ color: 0xffc078, transparent: true, opacity: 0.95, toneMapped: false });
-  mesh(new THREE.PlaneGeometry(1.05, 1.52), innerMat, {
+  mesh(new THREE.PlaneGeometry(0.9, 1.34), innerMat, {
     parent: root,
     x: 0,
     y: 1.58,
-    z: doorZ - 0.6,
+    z: doorZ - 0.34,
     cast: false,
   });
 
@@ -251,9 +287,9 @@ export function buildShrine(parent, opts = {}) {
     font: '700 82px "Yu Mincho", "MS Mincho", serif',
     radius: 5,
   });
-  batch.box(M.woodDeep, 1.86, 0.5, 0.09, 0, 2.79, doorZ + 0.14);
+  batch.box(M.woodDeep, 1.86, 0.5, 0.09, 0, 2.79, wallZ + 0.14);
   batch.build(root);
-  signPlane(root, nameTex, 1.7, 0.4, { y: 2.79, z: doorZ + 0.2 });
+  signPlane(root, nameTex, 1.7, 0.4, { y: 2.79, z: wallZ + 0.2 });
 
   /* ---- side walls ---- */
   for (const s of [-1, 1]) {
@@ -641,13 +677,21 @@ export function buildShrine(parent, opts = {}) {
 
   /* ---- warm interior light ---- */
   const interiorLight = new THREE.PointLight(0xffb066, 0, 6.5, 2);
-  interiorLight.position.set(0, 1.75, 0.0);
+  interiorLight.position.set(0, 1.75, -0.1);
   root.add(interiorLight);
 
   // side lantern near the steps, so the entrance reads at night
   const lantern = buildStoneLantern(root, { x: 3.55, y: 0.02, z: 4.0, scale: 0.82, ry: -0.25, withLight: true });
 
-  const update = (t, night) => {
+  const update = (t, night, dt = 0) => {
+    // slide the leaves toward the requested state; exponential smoothing keeps
+    // the motion frame-rate independent and settles without a visible stop
+    if (doorState.open !== doorState.target) {
+      const step = 1 - Math.exp(-Math.max(0, dt) * 6.5);
+      doorState.open += (doorState.target - doorState.open) * step;
+      if (Math.abs(doorState.target - doorState.open) < 0.002) doorState.open = doorState.target;
+      applyDoor(doorState.open);
+    }
     ritual.update(t, night);
     for (const m of windows) m.emissiveIntensity = night * (1.05 + 0.08 * Math.sin(t * 1.7 + m.id));
     interiorLight.intensity = night * 3.6;
@@ -658,7 +702,20 @@ export function buildShrine(parent, opts = {}) {
 
   root.scale.y = 1.1;
 
-  return { group: root, windows, interiorLight, update, ritual, saisen, lantern };
+  return {
+    group: root,
+    windows,
+    interiorLight,
+    update,
+    ritual,
+    saisen,
+    lantern,
+    doors: { left: leftDoor, right: rightDoor },
+    doorHit,
+    setDoor,
+    toggleDoor,
+    isDoorOpen: () => doorState.target > 0.5,
+  };
 }
 
 /* ------------------------------------------------------------------ */

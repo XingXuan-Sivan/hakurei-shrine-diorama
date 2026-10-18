@@ -322,7 +322,7 @@ export function buildStoneLantern(parent, opts = {}) {
   }
 
   // additive glow sprite, switched on at night
-  const glowTex = tex('glow.png');
+  const glowTex = tex('glow.webp');
   const glowMat = new THREE.SpriteMaterial({
     map: glowTex,
     color: 0xffc978,
@@ -939,7 +939,7 @@ export function buildHangingLantern(parent, opts = {}) {
   mesh(new THREE.CylinderGeometry(0.18 * s, 0.18 * s, 0.04 * s, 12), M.woodDark, { parent: pivot, y: -0.71 * s, cast: false });
   // red bands and a simple kanji plaque
   mesh(new THREE.CylinderGeometry(0.174 * s, 0.174 * s, 0.035 * s, 12), M.red, { parent: pivot, y: -0.38 * s, cast: false });
-  const glowTexture = tex('glow.png');
+  const glowTexture = tex('glow.webp');
   const glowMat = new THREE.SpriteMaterial({
     map: glowTexture,
     color: 0xffb35c,

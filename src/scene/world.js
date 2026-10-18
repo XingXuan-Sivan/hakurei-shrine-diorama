@@ -255,9 +255,9 @@ export class World {
 
   /* ---------------- ground ---------------- */
   buildGround() {
-    const gravel = toon(0xfff5e2, { map: tex('gravel.png', { repeat: [10, 10] }) });
-    const terraceMat = toon(0xfff9ea, { map: tex('gravel.png', { repeat: [9, 9] }) });
-    const mossGround = toon(0x829566, { map: tex('gravel.png', { repeat: [4, 4] }) });
+    const gravel = toon(0xfff5e2, { map: tex('gravel.webp', { repeat: [10, 10] }) });
+    const terraceMat = toon(0xfff9ea, { map: tex('gravel.webp', { repeat: [9, 9] }) });
+    const mossGround = toon(0x829566, { map: tex('gravel.webp', { repeat: [4, 4] }) });
 
     // front courtyard
     const front = box(BASE - 0.34, 0.09, HALF - TERRACE_FRONT_Z + 0.2, gravel, {
@@ -425,8 +425,8 @@ export class World {
   buildPath() {
     const batch = new Batcher();
     const rnd = seeded(5);
-    const pathMat = toon(0xc2c5b8, { map: tex('stone.png') });
-    const pathMatLight = toon(0xd4d4c6, { map: tex('stone.png') });
+    const pathMat = toon(0xc2c5b8, { map: tex('stone.webp') });
+    const pathMatLight = toon(0xd4d4c6, { map: tex('stone.webp') });
     // broad stone landing at the foot of the shrine steps
     for (let row = 0; row < 2; row++) {
       for (let col = -2; col <= 2; col++) {
@@ -663,6 +663,13 @@ export class World {
     // ema and omikuji on the right
     this.ema = buildEmaRack(this.root, { x: 8.25, y: FRONT_Y, z: 4.9, ry: -0.62 });
     this.omikuji = buildOmikujiRack(this.root, { x: 7.75, y: FRONT_Y, z: 8.15, ry: -0.38 });
+    // the hanging strips are thin and full of gaps, so the whole rack gets one
+    // generous, invisible tap target
+    this.omikuji.hit = mesh(
+      new THREE.PlaneGeometry(1.95, 1.8),
+      new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }),
+      { parent: this.omikuji.group, y: 0.95, z: 0.14, cast: false, receive: false },
+    );
     this.notice = buildNoticeBoard(this.root, { x: -5.35, y: FRONT_Y, z: 6.75, ry: 0.25 });
 
     // stone lanterns, flanking the path and the terrace
@@ -723,7 +730,7 @@ export class World {
 
   makeLightPool(x, y, z, scale = 1) {
     const mat = new THREE.MeshBasicMaterial({
-      map: tex('glow.png'),
+      map: tex('glow.webp'),
       color: 0xffc477,
       transparent: true,
       opacity: 0,
@@ -791,8 +798,8 @@ export class World {
 
     // visible drifting petals and leaves. Every particle is born at the
     // canopy of a real tree, so nothing appears to grow out of the roof/air.
-    const petalMap = tex('petal.png');
-    const leafMap = tex('leaf.png');
+    const petalMap = tex('petal.webp');
+    const leafMap = tex('leaf.webp');
     const petalMat = new THREE.MeshBasicMaterial({
       map: petalMap,
       transparent: true,
@@ -884,7 +891,7 @@ export class World {
 
     // faint spirit motes
     const moteMatBase = new THREE.SpriteMaterial({
-      map: tex('glow.png'),
+      map: tex('glow.webp'),
       color: 0xfff0c8,
       transparent: true,
       opacity: 0.14,
@@ -913,7 +920,7 @@ export class World {
 
   buildShadow() {
     const mat = new THREE.MeshBasicMaterial({
-      map: tex('soft-shadow.png'),
+      map: tex('soft-shadow.webp'),
       transparent: true,
       opacity: 0.42,
       depthWrite: false,
@@ -972,7 +979,7 @@ export class World {
         s.pivot.rotation.x = Math.sin(t * 1.02 + s.phase * 1.7) * 0.12;
       }
     }
-    this.shrine.update(t, night);
+    this.shrine.update(t, night, dt);
     this.office.update(t, night);
     this.hokora.update(t, night);
 
