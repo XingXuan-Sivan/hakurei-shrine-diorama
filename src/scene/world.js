@@ -840,15 +840,20 @@ export class World {
       const isLeaf = tr.kind !== 'cherry';
       const px = c.x + randRange(this.rnd, -spread, spread);
       const pz = c.z + randRange(this.rnd, -spread, spread);
+      const yTop = Math.max(0.85, c.y - 0.25 - this.rnd() * 1.0);
       const d = {
         x0: Math.max(-10.15, Math.min(10.15, px)),
         z0: Math.max(-10.15, Math.min(10.15, pz)),
-        yTop: Math.max(0.45, c.y - 1.8 - this.rnd() * 1.1),
-        fallDist: Math.min(2.8, Math.max(0.9, c.y - 1.0)),
+        yTop,
+        fallDist: Math.max(0.9, yTop - 0.6),
         phase: this.rnd(),
-        speed: 0.16 + this.rnd() * 0.2,
-        fall: 0.03 + this.rnd() * 0.03,
-        radius: 0.3 + this.rnd() * 0.65,
+        // ~5 seconds from crown to ground: the old 0.03–0.06 rate took 20s+
+        // and read as leaves hanging in the air
+        fall: 0.14 + this.rnd() * 0.1,
+        radius: 0.34 + this.rnd() * 0.52,
+        swayFreq: 1.15 + this.rnd() * 0.95,
+        flutter: 0.05 + this.rnd() * 0.08,
+        flutterFreq: 1.7 + this.rnd() * 1.5,
         spinA: this.rnd() * 1.6,
         spinB: this.rnd() * 1.2,
         scale: isLeaf ? 0.75 + this.rnd() * 0.45 : 0.9 + this.rnd() * 0.5,
@@ -888,6 +893,51 @@ export class World {
       data: [...petalData.map((x) => x.d), ...leafData.map((x) => x.d)],
     };
     this.root.add(petalIM, leafIM);
+
+    /* ---- one-shot burst pool: shaken trees shed leaves through this ---- */
+    const burstIM = new THREE.InstancedMesh(fallLeafGeo, leafMat, 48);
+    burstIM.frustumCulled = false;
+    burstIM.renderOrder = 4;
+    burstIM.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    const burstTints = [0xb4813e, 0xc39853, 0xd0a75c, 0x9b7248, 0x8a9a63, 0xdba86a];
+    const hidden = new THREE.Matrix4().makeScale(0, 0, 0);
+    for (let i = 0; i < 48; i++) {
+      burstIM.setColorAt(i, new THREE.Color(burstTints[i % burstTints.length]));
+      burstIM.setMatrixAt(i, hidden);
+    }
+    if (burstIM.instanceColor) burstIM.instanceColor.needsUpdate = true;
+    this.root.add(burstIM);
+    this.burst = { im: burstIM, parts: [] };
+
+    const spawnFrom = new THREE.Vector3();
+    this.burstLeaves = (tree, count = 16) => {
+      if (!this.burst) return;
+      tree.canopy.getWorldPosition(spawnFrom);
+      const spread = Math.max(0.5, (tree.radius || 2) * 0.42);
+      for (let n = 0; n < count; n++) {
+        if (this.burst.parts.length >= 48) {
+          // recycle the oldest burst leaf once the pool is full
+          this.burst.parts.shift();
+        }
+        const a = this.rnd() * Math.PI * 2;
+        const rr = spread * (0.15 + this.rnd() * 0.85);
+        this.burst.parts.push({
+          x: spawnFrom.x + Math.cos(a) * rr,
+          y: spawnFrom.y + (this.rnd() - 0.45) * spread * 0.8,
+          z: spawnFrom.z + Math.sin(a) * rr,
+          vx: Math.cos(a) * (0.5 + this.rnd() * 0.9),
+          vy: 0.15 + this.rnd() * 0.55,
+          vz: Math.sin(a) * (0.5 + this.rnd() * 0.9),
+          rx: this.rnd() * 6.28,
+          ry: this.rnd() * 6.28,
+          rz: this.rnd() * 6.28,
+          spin: 2.2 + this.rnd() * 3.4,
+          life: 0,
+          max: 2.1 + this.rnd() * 1.1,
+          scale: 0.7 + this.rnd() * 0.45,
+        });
+      }
+    };
 
     // faint spirit motes
     const moteMatBase = new THREE.SpriteMaterial({
@@ -1010,18 +1060,22 @@ export class World {
       let li = 0;
       for (const d of this.falling.data) {
         const drop = ((t * d.fall + d.phase) % 1 + 1) % 1;
-        const fade = 0.55 + 0.45 * Math.sin(Math.PI * Math.min(1, drop));
+        // fade in under the crown and out just above the ground, so a leaf never
+        // pops when its loop restarts
+        const edge = Math.min(1, drop / 0.1) * Math.min(1, (1 - drop) / 0.12);
+        const swayX = Math.sin(t * d.swayFreq + d.phase * 6.28) * d.radius * (0.55 + drop * 0.45);
+        const swayZ = Math.cos(t * d.swayFreq * 0.78 + d.phase * 5.1) * d.radius * 0.62;
         dummy.position.set(
-          d.x0 + Math.sin(t * 0.28 * d.speed + d.phase * 6.28) * d.radius,
-          d.yTop - drop * d.fallDist,
-          d.z0 + Math.cos(t * 0.22 * d.speed + d.phase * 5.1) * d.radius * 0.7,
+          d.x0 + swayX,
+          d.yTop - drop * d.fallDist + Math.sin(t * d.flutterFreq + d.phase * 4.4) * d.flutter,
+          d.z0 + swayZ,
         );
         dummy.rotation.set(
-          d.phase * 6 + t * d.spinA,
-          d.phase * 3 + t * d.spinB,
-          Math.sin(t * 0.7 + d.phase * 4) * 0.8,
+          d.phase * 6 + t * d.spinA * 2.2,
+          d.phase * 3 + t * d.spinB * 1.8,
+          Math.sin(t * 1.5 + d.phase * 4) * 1.05,
         );
-        dummy.scale.setScalar(d.scale * (0.28 + 0.72 * fade));
+        dummy.scale.setScalar(d.scale * Math.max(0, Math.min(1, edge * 1.35)));
         dummy.updateMatrix();
         if (d.isLeaf) {
           this.falling.leafIM.setMatrixAt(li++, dummy.matrix);
@@ -1031,6 +1085,51 @@ export class World {
       }
       this.falling.petalIM.instanceMatrix.needsUpdate = true;
       this.falling.leafIM.instanceMatrix.needsUpdate = true;
+    }
+
+    // leaves knocked loose by a shaken tree
+    if (this.burst) {
+      const dummy = this._fallDummy || (this._fallDummy = new THREE.Object3D());
+      const im = this.burst.im;
+      const keep = [];
+      for (const p of this.burst.parts) {
+        p.life += dt;
+        if (p.life >= p.max) continue;
+        p.vy -= 4.2 * dt;
+        const drag = Math.exp(-dt * 1.15);
+        p.vx *= drag;
+        p.vz *= drag;
+        p.x += p.vx * dt + Math.sin(p.life * 5.5 + p.ry) * 0.3 * dt;
+        p.z += p.vz * dt + Math.cos(p.life * 4.5 + p.rx) * 0.3 * dt;
+        p.y += p.vy * dt;
+        p.rx += p.spin * dt;
+        p.rz += p.spin * 0.65 * dt;
+        if (p.y < 0.62) {
+          p.y = 0.62;
+          p.vy *= -0.12;
+          p.vx *= 0.8;
+          p.vz *= 0.8;
+        }
+        keep.push(p);
+      }
+      this.burst.parts = keep;
+      for (let i = 0; i < 48; i++) {
+        const p = keep[i];
+        if (!p) {
+          dummy.position.set(0, -99, 0);
+          dummy.scale.setScalar(0.0001);
+          dummy.rotation.set(0, 0, 0);
+        } else {
+          const k = p.life / p.max;
+          const edge = Math.min(1, p.life / 0.12) * Math.min(1, (1 - k) / 0.18);
+          dummy.position.set(p.x, p.y, p.z);
+          dummy.rotation.set(p.rx, p.ry, p.rz);
+          dummy.scale.setScalar(p.scale * Math.max(0, edge));
+        }
+        dummy.updateMatrix();
+        im.setMatrixAt(i, dummy.matrix);
+      }
+      im.instanceMatrix.needsUpdate = true;
     }
 
     for (const m of this.motes) {

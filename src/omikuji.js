@@ -70,7 +70,17 @@ export class Omikuji {
     this.to = new THREE.Vector3(0, 0, -DIST);
     this.tilt = 0;
 
-    this.draw(FORTUNES[0]);
+    // one slip per shrine day: the same day always returns the same fortune
+    this.day = 0;
+    this.drawnDay = -1;
+    this.fortune = FORTUNES[0];
+
+    this.draw(this.fortune);
+  }
+
+  /** The shrine's day counter, advanced by the clock in main.js. */
+  setDay(day) {
+    this.day = day;
   }
 
   get visible() {
@@ -146,7 +156,13 @@ export class Omikuji {
     this.p = 0;
     this.outward = true;
     this.mesh.visible = true;
-    this.draw(FORTUNES[Math.floor(Math.random() * FORTUNES.length)]);
+    // a draw is kept for the rest of the shrine day, so tapping again shows the
+    // exact same slip instead of rerolling it
+    if (this.drawnDay !== this.day) {
+      this.drawnDay = this.day;
+      this.fortune = FORTUNES[Math.floor(Math.random() * FORTUNES.length)];
+    }
+    this.draw(this.fortune);
   }
 
   dismiss() {

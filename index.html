@@ -12,11 +12,26 @@
     <div id="stage" aria-hidden="true"></div>
 
     <header class="hud">
-      <h1 class="title">博丽神社 <i>·</i> <span id="phase-name">昼</span></h1>
-      <div class="controls" role="group" aria-label="昼夜切换">
-        <button type="button" data-mode="auto" class="active" aria-pressed="true">昼夜流转</button>
-        <button type="button" data-mode="day" aria-pressed="false">白昼</button>
-        <button type="button" data-mode="night" aria-pressed="false">夜晚</button>
+      <h1 class="title">博麗神社 <i>·</i> <span id="phase-name">昼</span></h1>
+      <div class="clock" role="group" aria-label="时间">
+        <button id="clock-auto" class="clock-auto" type="button" aria-pressed="true">自动</button>
+        <div class="clock-dial">
+          <span class="clock-arc" aria-hidden="true"></span>
+          <span class="clock-ticks" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+          <span id="clock-thumb" class="clock-thumb" aria-hidden="true"></span>
+          <input
+            id="clock-range"
+            class="clock-range"
+            type="range"
+            min="0"
+            max="1000"
+            step="1"
+            value="140"
+            aria-label="时间（拖动切换昼夜）"
+            aria-valuetext="06:00"
+          />
+        </div>
+        <span id="clock-time" class="clock-time">06:00</span>
       </div>
     </header>
 

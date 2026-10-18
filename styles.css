@@ -89,11 +89,12 @@ body {
   opacity: 0.9;
 }
 
-.controls {
+/* a small shrine clock: auto switch, a gradient day arc and the hour */
+.clock {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  padding: 5px;
+  gap: 10px;
+  padding: 5px 14px 5px 6px;
   border-radius: 999px;
   background: var(--pill);
   border: 1px solid var(--pill-edge);
@@ -102,39 +103,156 @@ body {
   pointer-events: auto;
 }
 
-.controls button {
+.clock-auto {
   appearance: none;
   border: 0;
   border-radius: 999px;
-  padding: 7px 17px;
+  padding: 6px 13px;
   background: transparent;
   color: var(--cream-dim);
   font-family: inherit;
-  font-size: 13.5px;
+  font-size: 12.5px;
   line-height: 1.5;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.14em;
   cursor: pointer;
-  transition: color 220ms ease, background-color 220ms ease, transform 220ms ease;
   white-space: nowrap;
+  transition: color 220ms ease, background-color 220ms ease;
 }
 
-.controls button:hover {
+.clock-auto:hover {
   color: var(--cream);
 }
 
-.controls button:active {
-  transform: translateY(1px);
-}
-
-.controls button.active {
+.clock-auto[aria-pressed="true"] {
   background: var(--active);
   color: var(--active-ink);
   font-weight: 500;
 }
 
-.controls button:focus-visible {
+.clock-auto:focus-visible {
   outline: 2px solid rgba(238, 227, 200, 0.55);
   outline-offset: 2px;
+}
+
+.clock-dial {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 226px;
+  height: 30px;
+}
+
+.clock-arc {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 7px;
+  margin-top: -3.5px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    #d98a4e 0%,
+    #c58a54 7%,
+    #8f9f9c 17%,
+    #7fa9ab 26%,
+    #71999a 40%,
+    #a97a5e 48%,
+    #d9834f 52%,
+    #6b5a6e 60%,
+    #24304f 70%,
+    #101a30 78%,
+    #2a3452 90%,
+    #b57a52 97%,
+    #d98a4e 100%
+  );
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 -1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.clock-dial:focus-within .clock-arc {
+  box-shadow: 0 0 0 2px rgba(238, 227, 200, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.clock-ticks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.clock-ticks i {
+  position: absolute;
+  top: 50%;
+  width: 2px;
+  height: 2px;
+  margin: -1px 0 0 -1px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.clock-ticks i:nth-child(1) {
+  left: 0;
+}
+
+.clock-ticks i:nth-child(2) {
+  left: 25%;
+}
+
+.clock-ticks i:nth-child(3) {
+  left: 50%;
+}
+
+.clock-ticks i:nth-child(4) {
+  left: 75%;
+}
+
+.clock-thumb {
+  position: absolute;
+  top: 50%;
+  left: 14%;
+  width: 21px;
+  height: 21px;
+  margin: -10.5px 0 0 -10.5px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, #fff9e2, #ffd67f 52%, #ef9c45);
+  box-shadow: 0 0 12px rgba(255, 205, 128, 0.7), 0 1px 3px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  transition: background 480ms ease, box-shadow 480ms ease, transform 180ms ease;
+}
+
+.clock:hover .clock-thumb {
+  transform: scale(1.08);
+}
+
+.clock.night .clock-thumb {
+  background: radial-gradient(circle at 36% 32%, #fdfbf2, #e8e4d0 58%, #c9c4ad);
+  box-shadow: 0 0 13px rgba(228, 236, 255, 0.55), 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.clock-range {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+}
+
+.clock-range:active {
+  cursor: grabbing;
+}
+
+.clock-time {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+  color: var(--cream-dim);
+  min-width: 40px;
 }
 
 @media (max-width: 560px) {
@@ -143,14 +261,33 @@ body {
     letter-spacing: 0.1em;
   }
 
-  .controls button {
-    padding: 6px 12px;
-    font-size: 12px;
+  .clock {
+    gap: 8px;
+    padding-right: 10px;
+  }
+
+  .clock-auto {
+    padding: 5px 10px;
+    font-size: 11.5px;
+  }
+
+  .clock-dial {
+    width: 140px;
+  }
+
+  .clock-ticks {
+    display: none;
+  }
+
+  .clock-time {
+    font-size: 11px;
+    min-width: 34px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .controls button {
+  .clock-auto,
+  .clock-thumb {
     transition: none;
   }
 }

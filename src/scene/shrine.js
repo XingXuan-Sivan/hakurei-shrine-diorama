@@ -247,14 +247,18 @@ export function buildShrine(parent, opts = {}) {
     { parent: root, y: 1.35, z: 0.38, cast: false, receive: false },
   );
 
-  // the hall behind the leaves: a shallow, warm niche with an altar, so the
-  // opening reads as an interior rather than a black rectangle. Everything in
-  // here starts behind z≈0.10, clear of the leaves even when they are closed.
+  // the hall behind the leaves, held deep and low-ceilinged so the altar sits
+  // inside a room instead of against its back wall
   const doorZ = 0.16;
-  // side walls and a ceiling close the box, so the niche has corners and shadow
-  for (const s of [-1, 1]) batch.box(M.woodDeep, 0.1, 1.92, 0.62, s * 0.66, 1.47, doorZ - 0.31);
-  batch.box(M.woodDark, 1.44, 0.08, 0.62, 0, 2.44, doorZ - 0.31);
-  batch.box(M.woodDeep, 2.24, 1.9, 0.1, 0, 1.48, doorZ - 0.4);
+  const nicheZ = -0.98;
+  // side walls, a ceiling and a deep back wall close the box, so the niche has
+  // corners, a floor line and shadow; the altar stays near the front third
+  for (const s of [-1, 1]) batch.box(M.woodDeep, 0.1, 1.92, 1.06, s * 0.66, 1.47, -0.45);
+  batch.box(M.woodDark, 1.44, 0.08, 1.06, 0, 2.44, -0.45);
+  batch.box(M.woodDeep, 2.24, 1.9, 0.1, 0, 1.48, nicheZ - 0.06);
+  // floor boards running back, so the eye reads distance rather than a slab
+  batch.box(M.wood, 1.3, 0.06, 1.08, 0, 0.795, -0.46);
+  batch.box(M.woodDark, 1.34, 0.05, 0.06, 0, 0.83, nicheZ + 0.16);
   batch.box(M.wood, 1.2, 0.1, 0.34, 0, 0.92, doorZ - 0.24);
   batch.box(M.red, 0.64, 0.46, 0.3, 0, 1.18, doorZ - 0.37);
   batch.box(M.brass, 0.72, 0.06, 0.34, 0, 1.42, doorZ - 0.37);
@@ -265,16 +269,40 @@ export function buildShrine(parent, opts = {}) {
     z: doorZ - 0.37,
     cast: true,
   });
-  // warm lamp card deep in the niche; there is deliberately no flat glow plane
-  // at the threshold, so the doorway reads as real interior
-  const innerMat = new THREE.MeshBasicMaterial({ color: 0xffc078, transparent: true, opacity: 0.95, toneMapped: false });
-  mesh(new THREE.PlaneGeometry(0.9, 1.34), innerMat, {
+
+  /* ---- things standing in the hall behind the altar ---- */
+  // offering shelf to one side of the altar, where the doorway actually shows it
+  batch.box(M.woodDark, 0.4, 0.06, 0.28, -0.42, 1.14, nicheZ + 0.5);
+  for (const s of [-1, 1]) batch.box(M.woodDark, 0.05, 0.34, 0.22, -0.42 + s * 0.15, 0.97, nicheZ + 0.5);
+  for (const s of [-1, 1]) {
+    mesh(new THREE.CylinderGeometry(0.062, 0.048, 0.16, 10), M.brass, {
+      parent: root,
+      x: -0.42 + s * 0.11,
+      y: 1.25,
+      z: nicheZ + 0.5,
+      cast: true,
+    });
+  }
+  // folded paper offerings on the floor beside it
+  mesh(new THREE.BoxGeometry(0.22, 0.16, 0.18), M.paper, { parent: root, x: 0.42, y: 0.88, z: nicheZ + 0.42, cast: false });
+  mesh(new THREE.BoxGeometry(0.18, 0.12, 0.15), M.woodLight, { parent: root, x: 0.42, y: 0.8, z: nicheZ + 0.42, cast: false });
+  // a hanging lantern further in, giving the depth a second light
+  const innerLantern = mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.26, 12), M.paper, {
     parent: root,
-    x: 0,
-    y: 1.58,
-    z: doorZ - 0.34,
+    x: 0.44,
+    y: 1.86,
+    z: nicheZ + 0.3,
     cast: false,
   });
+  innerLantern.material = innerLantern.material.clone();
+  innerLantern.material.emissive = new THREE.Color(0xffb877);
+  innerLantern.material.emissiveIntensity = 1;
+  batch.box(M.woodDark, 0.03, 0.5, 0.03, 0.44, 2.22, nicheZ + 0.3);
+  batch.box(M.woodDark, 0.16, 0.03, 0.16, 0.44, 1.99, nicheZ + 0.3);
+
+  // a dim card against the far wall: the room is lit, not filled with a glow
+  const farMat = new THREE.MeshBasicMaterial({ color: 0xf0a765, transparent: true, opacity: 0.42, toneMapped: false });
+  mesh(new THREE.PlaneGeometry(0.52, 0.72), farMat, { parent: root, x: 0.06, y: 1.64, z: nicheZ + 0.02, cast: false });
 
   // front signboard above the door
   const nameTex = textTexture('博麗神社', {
@@ -677,7 +705,7 @@ export function buildShrine(parent, opts = {}) {
 
   /* ---- warm interior light ---- */
   const interiorLight = new THREE.PointLight(0xffb066, 0, 6.5, 2);
-  interiorLight.position.set(0, 1.75, -0.1);
+  interiorLight.position.set(0, 1.92, -0.36);
   root.add(interiorLight);
 
   // side lantern near the steps, so the entrance reads at night
@@ -694,7 +722,7 @@ export function buildShrine(parent, opts = {}) {
     }
     ritual.update(t, night);
     for (const m of windows) m.emissiveIntensity = night * (1.05 + 0.08 * Math.sin(t * 1.7 + m.id));
-    interiorLight.intensity = night * 3.6;
+    interiorLight.intensity = night * 3.6 + (1 - night) * 2.6 * doorState.open;
     lantern.windows.forEach((m, i) => (m.emissiveIntensity = night * (0.8 + 0.1 * Math.sin(t * 3.1 + i))));
     lantern.glow.material.opacity = night * 0.22;
     if (lantern.point) lantern.point.intensity = night * 1.2;

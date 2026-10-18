@@ -8,7 +8,7 @@ import { Interaction } from './interaction.js';
 import { SpeechBubble } from './bubble.js';
 import { Omikuji } from './omikuji.js';
 import { Coins } from './coins.js';
-import { playSlide } from './audio.js';
+import { playSlide, playPaper } from './audio.js';
 
 const TARGET = new THREE.Vector3(0, 2.6, -0.6);
 const CAM_START = new THREE.Vector3(26.8, 19.8, 35.8);
@@ -17,7 +17,11 @@ const FOV = 31;
 const stage = document.getElementById('stage');
 const backdrop = document.getElementById('backdrop');
 const phaseName = document.getElementById('phase-name');
-const buttons = [...document.querySelectorAll('.controls button')];
+const clockUi = document.querySelector('.clock');
+const clockRange = document.getElementById('clock-range');
+const clockThumb = document.getElementById('clock-thumb');
+const clockAuto = document.getElementById('clock-auto');
+const clockTime = document.getElementById('clock-time');
 const IS_MOBILE =
   window.matchMedia('(pointer: coarse)').matches ||
   Math.min(window.innerWidth, window.innerHeight) < 720;
@@ -95,6 +99,7 @@ const dayFill = new THREE.Color(0xc3d6ef);
 const nightFill = new THREE.Color(0x3c5682);
 const dayRim = new THREE.Color(0xffd6a2);
 const nightRim = new THREE.Color(0xffb46b);
+const duskSun = new THREE.Color(0xff9a52);
 
 /* ------------------------------------------------------------------ */
 /* world + character                                                   */
@@ -179,70 +184,105 @@ window.addEventListener('resize', () => {
 camera.updateProjectionMatrix();
 
 /* ------------------------------------------------------------------ */
-/* day / night                                                         */
+/* time of day                                                         */
 /* ------------------------------------------------------------------ */
-const CYCLE = 104;
-let mode = 'auto';
-let phase = 8;
-let day = 1;
-let targetDay = 1;
-let lastPhaseLabel = '';
-
-function smoothstep(t) {
-  t = Math.min(1, Math.max(0, t));
+// timeOfDay runs 0 → 1 across one full day: 0 = 06:00 sunrise, 0.25 = noon,
+// 0.5 = 18:00 sunset, 0.75 = midnight. Auto mode walks it at 1/CYCLE per
+// second, so a whole day takes a little over two minutes.
+const CYCLE = 150;
+const DAY_SPAN = 0.5;
+const clamp01 = (v) => Math.min(1, Math.max(0, v));
+const smoothstep = (t) => {
+  t = clamp01(t);
   return t * t * (3 - 2 * t);
-}
+};
 
-function dayForPhase(p) {
-  if (p < 44) return 1;
-  if (p < 52) return 1 - smoothstep((p - 44) / 8);
-  if (p < 92) return 0;
-  if (p < 100) return smoothstep((p - 92) / 8);
-  return 1;
-}
-
-function setMode(next) {
-  mode = next;
-  if (mode === 'auto') {
-    phase = day > 0.55 ? 10 : 60;
-  } else if (mode === 'day') {
-    targetDay = 1;
-    phase = 10;
-  } else {
-    targetDay = 0;
-    phase = 60;
-  }
-  buttons.forEach((b) => {
-    const on = b.dataset.mode === mode;
-    b.classList.toggle('active', on);
-    b.setAttribute('aria-pressed', on ? 'true' : 'false');
-  });
-}
-
-for (const b of buttons) {
-  b.addEventListener('click', () => setMode(b.dataset.mode));
-}
+const startT = parseFloat(params.get('t'));
+let timeOfDay = Number.isFinite(startT) ? ((startT % 1) + 1) % 1 : 0.14;
+let targetTime = timeOfDay;
+let auto = true;
+let interacting = false;
+let day = 1;
+let warmth = 0;
+let cel = { u: 0.28, v: 0.28, isDay: 1, alt: 0.78, signed: 0.78, warm: 0 };
+let lastPhaseLabel = '';
+let lastClockText = '';
+let shrineDay = 0;
 
 if (params.get('mode') === 'night') {
-  mode = 'night';
-  day = 0;
-  targetDay = 0;
-  phase = 60;
+  timeOfDay = targetTime = 0.76;
+  auto = false;
 } else if (params.get('mode') === 'day') {
-  mode = 'day';
-  day = 1;
-  targetDay = 1;
-  phase = 10;
+  timeOfDay = targetTime = 0.22;
+  auto = false;
 }
-setMode(mode);
-if (mode === 'night') day = 0;
-if (mode === 'day') day = 1;
+if (params.get('auto') === '0') auto = false;
 
-function phaseLabel() {
-  if (day > 0.78) return '昼';
-  if (day > 0.3) return '暮';
+function celestialFor(tod) {
+  const isDay = tod < DAY_SPAN ? 1 : 0;
+  const u = isDay ? tod / DAY_SPAN : (tod - DAY_SPAN) / (1 - DAY_SPAN);
+  const alt = Math.sin(Math.PI * clamp01(u));
+  const signed = isDay ? alt : -alt;
+  // the warm band is widest right on the horizon, which is what makes a slow
+  // dawn and dusk read as a time-lapse rather than a fade
+  return { u, v: u, isDay, alt, signed, warm: clamp01(1 - Math.abs(signed) / 0.46) };
+}
+
+// signed altitude → light: exactly half-lit on the horizon, so sunrise and
+// sunset take a few seconds instead of switching
+function dayFor(c) {
+  return smoothstep((c.signed + 0.26) / 0.52);
+}
+
+function clockText(c) {
+  const h = c.isDay ? 6 + c.u * 12 : 18 + c.u * 12;
+  const hh = Math.floor(h % 24);
+  const mm = Math.floor(((h % 1) * 60) / 5) * 5;
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+}
+
+function phaseLabel(c) {
+  if (c.isDay) {
+    if (c.u < 0.12) return day > 0.6 ? '朝' : '暁';
+    if (c.u > 0.86) return day > 0.6 ? '夕' : '暮';
+    return '昼';
+  }
+  if (c.u < 0.14) return '暮';
   return '夜';
 }
+
+/* ---- slider ---- */
+function setAuto(next) {
+  auto = next;
+  clockAuto.setAttribute('aria-pressed', auto ? 'true' : 'false');
+  clockUi.classList.toggle('is-auto', auto);
+  if (auto) targetTime = timeOfDay;
+}
+clockAuto.addEventListener('click', () => setAuto(!auto));
+
+const readSlider = () => parseFloat(clockRange.value) / 1000;
+clockRange.addEventListener('input', () => {
+  setAuto(false);
+  targetTime = readSlider();
+  interacting = true;
+});
+clockRange.addEventListener('change', () => {
+  targetTime = readSlider();
+});
+clockRange.addEventListener('pointerdown', () => {
+  interacting = true;
+});
+const releaseSlider = () => {
+  interacting = false;
+};
+window.addEventListener('pointerup', releaseSlider);
+window.addEventListener('pointercancel', releaseSlider);
+clockRange.addEventListener('keydown', () => {
+  interacting = true;
+  window.clearTimeout(clockRange._idle);
+  clockRange._idle = window.setTimeout(releaseSlider, 420);
+});
+setAuto(auto);
 
 function updateLights(night) {
   hemi.color.copy(dayHemiSky).lerp(nightHemiSky, night);
@@ -250,8 +290,9 @@ function updateLights(night) {
   hemi.intensity = THREE.MathUtils.lerp(1.55, 0.76, night);
   ambient.intensity = THREE.MathUtils.lerp(0.26, 0.23, night);
 
-  sun.color.copy(daySun).lerp(nightSun, night);
-  sun.intensity = THREE.MathUtils.lerp(1.7, 0.84, night) * (1 + Math.sin(t * 0.21) * 0.028);
+  sun.color.copy(daySun).lerp(duskSun, warmth * 0.9);
+  sun.color.lerp(nightSun, night * 0.85);
+  sun.intensity = THREE.MathUtils.lerp(1.7, 0.84, night) * (1 - warmth * 0.18) * (1 + Math.sin(t * 0.21) * 0.028);
   sun.position.set(-15 + Math.sin(t * 0.13) * 0.85, 25, 16 + Math.cos(t * 0.1) * 0.65);
   fill.color.copy(dayFill).lerp(nightFill, night);
   fill.intensity = THREE.MathUtils.lerp(0.58, 0.38, night);
@@ -308,11 +349,62 @@ interaction.add(world.omikuji.group, {
   },
 });
 
+// every tree answers a tap: a wobble plus a puff of shed leaves
+for (const tree of world.trees) {
+  if (!tree.canopy) continue;
+  interaction.add(tree.canopy, {
+    onTap: () => {
+      tree.shake();
+      world.burstLeaves(tree, 15);
+      playPaper();
+    },
+  });
+}
+
 if (params.get('door') === 'closed') world.shrine.setDoor(false);
 
 // dev hook: lets a headless browser drive and inspect the scene
 if (params.has('debug')) {
-  window.__diorama = { THREE, scene, camera, renderer, controls, world, reimu, interaction, bubble, omikuji, coins };
+  window.__diorama = {
+    THREE,
+    scene,
+    camera,
+    renderer,
+    controls,
+    world,
+    reimu,
+    interaction,
+    bubble,
+    omikuji,
+    coins,
+    time: {
+      get tod() {
+        return timeOfDay;
+      },
+      set tod(v) {
+        timeOfDay = ((v % 1) + 1) % 1;
+        targetTime = timeOfDay;
+      },
+      get day() {
+        return day;
+      },
+      get cel() {
+        return cel;
+      },
+      get auto() {
+        return auto;
+      },
+      get target() {
+        return targetTime;
+      },
+      get shrineDay() {
+        return shrineDay;
+      },
+      get warmth() {
+        return warmth;
+      },
+    },
+  };
 }
 
 /* ------------------------------------------------------------------ */
@@ -325,18 +417,27 @@ function frame() {
   const dt = Math.min(clock.getDelta(), 0.05);
   t += dt;
 
-  if (mode === 'auto') {
-    phase = (phase + dt) % CYCLE;
-    day = dayForPhase(phase);
+  const before = timeOfDay;
+  if (auto) {
+    timeOfDay = (timeOfDay + dt / CYCLE) % 1;
+    targetTime = timeOfDay;
   } else {
-    const k = 1 - Math.exp(-dt * 2.4);
-    day += (targetDay - day) * k;
-    if (Math.abs(targetDay - day) < 0.002) day = targetDay;
+    let d = targetTime - timeOfDay;
+    if (d > 0.5) d -= 1;
+    else if (d < -0.5) d += 1;
+    timeOfDay = (timeOfDay + d * (1 - Math.exp(-dt * 14)) + 1) % 1;
   }
+  // count a new shrine day when the clock rolls over sunrise
+  if (timeOfDay < before && before - timeOfDay > 0.5) shrineDay++;
+  omikuji.setDay(shrineDay);
+
+  cel = celestialFor(timeOfDay);
+  day = dayFor(cel);
+  warmth = cel.warm;
   const night = 1 - day;
 
   updateLights(night);
-  sky.update(t, day);
+  sky.update(t, day, cel);
   world.update(t, night, dt);
   reimu.update(dt, t, night);
 
@@ -345,10 +446,19 @@ function frame() {
   omikuji.update(dt);
   coins.update(dt);
 
-  const label = phaseLabel();
+  if (clockThumb) clockThumb.style.left = `${(timeOfDay * 100).toFixed(2)}%`;
+  if (!interacting) clockRange.value = String(Math.round(timeOfDay * 1000));
+  clockUi.classList.toggle('night', day < 0.5);
+
+  const label = phaseLabel(cel);
   if (label !== lastPhaseLabel) {
     lastPhaseLabel = label;
     phaseName.textContent = label;
+  }
+  const ct = clockText(cel);
+  if (ct !== lastClockText) {
+    lastClockText = ct;
+    if (clockTime) clockTime.textContent = ct;
   }
 
   controls.update();
@@ -358,10 +468,15 @@ function frame() {
 
 // pre-warm shaders / textures before the first visible frame
 if (renderer.compile) renderer.compile(scene, camera);
-/* The scene is intentionally chrome-free: only the title and the three
- * day/night controls sit above the canvas. */
+/* The scene is intentionally chrome-free: only the title and the time slider
+ * sit above the canvas. */
+cel = celestialFor(timeOfDay);
+day = dayFor(cel);
+warmth = cel.warm;
 updateLights(1 - day);
-sky.update(0, day);
+sky.update(0, day, cel);
+if (clockThumb) clockThumb.style.left = `${(timeOfDay * 100).toFixed(2)}%`;
+if (clockTime) clockTime.textContent = clockText(cel);
 controls.update();
 renderer.render(scene, camera);
 requestAnimationFrame(frame);

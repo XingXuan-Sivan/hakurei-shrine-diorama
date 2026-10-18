@@ -187,21 +187,48 @@ export function buildTree(parent, opts = {}) {
   }
 
   const basePos = canopy.position.clone();
+  let lastT = 0;
+  let shakeAt = -1e9;
+  let shakeAmp = 0;
   return {
     group: root,
     canopy,
     kind,
     radius: cr,
     phase,
+    /** Kick the crown: a damped wobble that decays in about a second. */
+    shake: (strength = 1) => {
+      shakeAt = lastT;
+      shakeAmp = Math.min(1.35, shakeAmp * 0.55 + strength);
+    },
+    get shaking() {
+      return shakeAmp > 0.01;
+    },
     sway: (t, wind = 1) => {
+      lastT = t;
       const slow = Math.sin(t * 0.5 * wind + phase);
       const slow2 = Math.sin(t * 0.31 * wind + phase * 1.7);
-      canopy.rotation.z = slow * 0.034 + Math.sin(t * 1.35 + phase * 2.1) * 0.007;
-      canopy.rotation.x = slow2 * 0.026;
-      crownInner.rotation.z = Math.sin(t * 1.1 + phase * 2.6) * 0.014;
-      crownInner.rotation.x = Math.cos(t * 0.83 + phase * 1.9) * 0.01;
-      canopy.position.x = basePos.x + Math.sin(t * 0.44 + phase) * 0.055;
+
+      let kick = 0;
+      let kickX = 0;
+      let lift = 0;
+      const age = t - shakeAt;
+      if (age >= 0 && age < 2.6) {
+        const decay = Math.exp(-3.15 * age);
+        kick = Math.sin(age * 25.5) * 0.155 * decay * shakeAmp;
+        kickX = Math.sin(age * 21.2 + 0.9) * 0.085 * decay * shakeAmp;
+        lift = Math.sin(age * 30.5 + 1.4) * 0.045 * decay * shakeAmp;
+      } else if (age >= 2.6 && shakeAmp) {
+        shakeAmp = 0;
+      }
+
+      canopy.rotation.z = slow * 0.034 + Math.sin(t * 1.35 + phase * 2.1) * 0.007 + kick;
+      canopy.rotation.x = slow2 * 0.026 + kickX;
+      crownInner.rotation.z = Math.sin(t * 1.1 + phase * 2.6) * 0.014 + kick * 0.55;
+      crownInner.rotation.x = Math.cos(t * 0.83 + phase * 1.9) * 0.01 + kickX * 0.5;
+      canopy.position.x = basePos.x + Math.sin(t * 0.44 + phase) * 0.055 + lift * 0.7;
       canopy.position.z = basePos.z + Math.cos(t * 0.37 + phase * 1.3) * 0.045;
+      canopy.position.y = basePos.y + lift * 0.35;
     },
   };
 }
